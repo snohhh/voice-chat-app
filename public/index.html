@@ -95,29 +95,21 @@
 </head>
 <body>
     <div class="header">
-        <h1>LG ThinQ Voice Interview</h1>
-        <p>Ask questions about LG ThinQ smart home features</p>
+        <h1>LG ThinQ 보이스</h1>
+        <p>LG ThinQ에 무엇을 물어보고 싶으신가요? 하단에 녹음 버튼을 사용해서 자유롭게 물어보세요. </p>
     </div>
 
     <div id="sessionInfo">
         <label for="sessionId">Session ID: </label>
         <input type="text" id="sessionId" readonly>
-        <label for="category">Category: </label>
-        <select id="category">
-            <option value="general">General Usage</option>
-            <option value="setup">Setup & Installation</option>
-            <option value="features">Specific Features</option>
-            <option value="troubleshooting">Troubleshooting</option>
-            <option value="integration">Device Integration</option>
-        </select>
     </div>
 
     <div id="conversation"></div>
     <div id="status"></div>
     <div class="controls">
-        <button id="startRecording" class="button">Start Recording</button>
-        <button id="stopRecording" class="button" disabled>Stop Recording</button>
-        <button id="downloadTranscript" class="button">Download Data</button>
+        <button id="startRecording" class="button">녹음 시작</button>
+        <button id="stopRecording" class="button" disabled>녹음 완료</button>
+        <button id="downloadTranscript" class="button">대화 기록 저장</button>
     </div>
 
     <script>
@@ -133,7 +125,6 @@
         const conversationDiv = document.getElementById('conversation');
         const statusDiv = document.getElementById('status');
         const sessionIdInput = document.getElementById('sessionId');
-        const categorySelect = document.getElementById('category');
 
         // Generate session ID
         sessionIdInput.value = 'INT_' + new Date().toISOString().replace(/[-:]/g, '').slice(0, 14);
@@ -301,7 +292,7 @@
             
             const metadata = document.createElement('div');
             metadata.className = 'metadata';
-            metadata.textContent = `${new Date().toISOString()} | Category: ${categorySelect.value}`;
+            metadata.textContent = new Date().toISOString();
             messageDiv.appendChild(metadata);
             
             conversationDiv.appendChild(messageDiv);
@@ -310,7 +301,6 @@
             conversationHistory.push({
                 timestamp: new Date().toISOString(),
                 sessionId: sessionIdInput.value,
-                category: categorySelect.value,
                 role: role,
                 content: content
             });
@@ -319,7 +309,6 @@
         function downloadTranscript() {
             const data = {
                 sessionId: sessionIdInput.value,
-                category: categorySelect.value,
                 timestamp: new Date().toISOString(),
                 conversations: conversationHistory
             };
