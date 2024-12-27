@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LG ThinQ Interview Assistant</title>
     <style>
+        /* Previous styles remain the same */
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
@@ -48,9 +49,13 @@
             background-color: #f44336;
             color: white;
         }
-        #downloadTranscript {
+        #downloadRecording, #downloadTranscript {
             background-color: #2196F3;
             color: white;
+        }
+        .button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
         }
         .message {
             margin: 10px 0;
@@ -96,7 +101,7 @@
 <body>
     <div class="header">
         <h1>LG ThinQ 보이스</h1>
-        <p>LG ThinQ에 무엇을 물어보고 싶으신가요? 하단에 녹음 버튼을 사용해서 자유롭게 물어보세요. </p>
+        <p>LG ThinQ에 무엇을 물어보고 싶으신가요? 하단 녹음 버튼을 사용해서 자유롭게 물어보세요. </p>
     </div>
 
     <div id="sessionInfo">
@@ -109,6 +114,7 @@
     <div class="controls">
         <button id="startRecording" class="button">녹음 시작</button>
         <button id="stopRecording" class="button" disabled>녹음 완료</button>
+        <button id="downloadRecording" class="button" disabled>녹음 파일 저장</button>
         <button id="downloadTranscript" class="button">대화 기록 저장</button>
     </div>
 
@@ -117,11 +123,13 @@
         let audioChunks = [];
         let conversationHistory = [];
         let stream = null;
+        let recordedAudioBlob = null;
         
         const API_BASE_URL = '/api/openai';
         const startRecordingButton = document.getElementById('startRecording');
         const stopRecordingButton = document.getElementById('stopRecording');
-        const downloadButton = document.getElementById('downloadTranscript');
+        const downloadRecordingButton = document.getElementById('downloadRecording');
+        const downloadTranscriptButton = document.getElementById('downloadTranscript');
         const conversationDiv = document.getElementById('conversation');
         const statusDiv = document.getElementById('status');
         const sessionIdInput = document.getElementById('sessionId');
@@ -160,9 +168,11 @@
                 mediaRecorder.addEventListener('stop', async () => {
                     try {
                         updateStatus('Processing audio...');
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                        if (audioBlob.size > 0) {
-                            await processAudioAndGetResponse(audioBlob);
+                        recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        downloadRecordingButton.disabled = false;
+                        
+                        if (recordedAudioBlob.size > 0) {
+                            await processAudioAndGetResponse(recordedAudioBlob);
                         } else {
                             throw new Error('No audio data recorded');
                         }
@@ -177,6 +187,7 @@
                 mediaRecorder.start();
                 startRecordingButton.disabled = true;
                 stopRecordingButton.disabled = false;
+                downloadRecordingButton.disabled = true;
                 updateStatus('Recording...');
                 
             } catch (error) {
@@ -195,6 +206,19 @@
                 startRecordingButton.disabled = false;
                 stopRecordingButton.disabled = true;
                 updateStatus('Processing...');
+            }
+        }
+
+        function downloadRecording() {
+            if (recordedAudioBlob) {
+                const url = URL.createObjectURL(recordedAudioBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `recording-${sessionIdInput.value}.webm`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
             }
         }
 
@@ -327,7 +351,8 @@
 
         startRecordingButton.addEventListener('click', startRecording);
         stopRecordingButton.addEventListener('click', stopRecording);
-        downloadButton.addEventListener('click', downloadTranscript);
+        downloadRecordingButton.addEventListener('click', downloadRecording);
+        downloadTranscriptButton.addEventListener('click', downloadTranscript);
     </script>
 </body>
 </html>
