@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Chat Assistant</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #conversation {
+            height: 400px;
+            border: 1px solid #ccc;
+            margin: 20px 0;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .user-message {
+            background-color: #e3f2fd;
+        }
+        .assistant-message {
+            background-color: #f5f5f5;
+        }
+    </style>
+</head>
+<body>
+    <h1>Voice Chat Assistant</h1>
+    <div id="conversation"></div>
+    <div class="controls">
+        <button id="startRecording">Start Recording</button>
+        <button id="stopRecording" disabled>Stop Recording</button>
+        <button id="downloadTranscript">Download Conversation</button>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let conversationHistory = [];
+        
+        const API_BASE_URL = '/api/openai';
+        const startRecordingButton = document.getElementById('startRecording');
+        const stopRecordingButton = document.getElementById('stopRecording');
+        const downloadButton = document.getElementById('downloadTranscript');
+        const conversationDiv = document.getElementById('conversation');
+
+        startRecordingButton.addEventListener('click', startRecording);
+        stopRecordingButton.addEventListener('click', stopRecording);
+        downloadButton.addEventListener('click', downloadTranscript);
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    await processAudioAndGetResponse(audioBlob);
+                    audioChunks = [];
+                };
+
+                mediaRecorder.start();
+                startRecordingButton.disabled = true;
+                stopRecordingButton.disabled = false;
+            } catch (error) {
+                console.error('Error accessing microphone:', error);
+                alert('Error accessing microphone. Please ensure you have granted permission.');
+            }
+        }
+
+        function stopRecording() {
+            mediaRecorder.stop();
+            startRecordingButton.disabled = false;
+            stopRecordingButton.disabled = true;
+        }
+
+        async function processAudioAndGetResponse(audioBlob) {
+            try {
+                const formData = new FormData();
+                formData.append('file', audioBlob, 'audio.wav');
+                formData.append('model', 'whisper-1');
+
+                const transcriptionResponse = await fetch(`${API_BASE_URL}/v1/audio/transcriptions`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const transcriptionData = await transcriptionResponse.json();
+                const userMessage = transcriptionData.text;
+
+                addMessageToConversation('user', userMessage);
+
+                const chatResponse = await fetch(`${API_BASE_URL}/v1/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: 'gpt-4',
+                        messages: [
+                            { role: 'user', content: userMessage }
+                        ]
+                    })
+                });
+
+                const chatData = await chatResponse.json();
+                const assistantMessage = chatData.choices[0].message.content;
+
+                addMessageToConversation('assistant', assistantMessage);
+
+                const speechResponse = await fetch(`${API_BASE_URL}/v1/audio/speech`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: 'tts-1',
+                        input: assistantMessage,
+                        voice: 'alloy'
+                    })
+                });
+
+                const audioBlob = await speechResponse.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+                audio.play();
+
+            } catch (error) {
+                console.error('Error processing audio:', error);
+                alert('Error processing audio. Please try again.');
+            }
+        }
+
+        function addMessageToConversation(role, content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}-message`;
+            messageDiv.textContent = content;
+            conversationDiv.appendChild(messageDiv);
+            conversationDiv.scrollTop = conversationDiv.scrollHeight;
+
+            conversationHistory.push({
+                timestamp: new Date().toISOString(),
+                role: role,
+                content: content
+            });
+        }
+
+        function downloadTranscript() {
+            const transcript = conversationHistory.map(msg => 
+                `[${msg.timestamp}] ${msg.role}: ${msg.content}`
+            ).join('\n\n');
+
+            const blob = new Blob([transcript], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `conversation-${new Date().toISOString()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
